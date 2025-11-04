@@ -51,6 +51,7 @@ def aes_enc_b64(msg,key):
     pad=16-(len(msg)%16)
     ct=cipher.encrypt(msg.encode()+bytes([pad])*pad)
     return base64.b64encode(ct).decode()
+
 def aes_dec_b64(b64,key):
     cipher=AES.new(key,AES.MODE_ECB)
     ct=base64.b64decode(b64)
@@ -63,21 +64,41 @@ def handler(conn,addr):
     try:
         req=recv_json(conn)
         if req.get("opcode")==0 and req.get("type")=="DH":
+            # ① p, g 선택
             p=pick_prime_400_500()
             for g in range(2,p):
                 if is_generator(g,p): break
+            logging.info(f"[Bob P3] Selected prime p={p}, generator g={g}")
+            
+            # ② Bob의 개인키 b, 공개키 B 생성
             b=random.randint(2,p-2)
             B=pow(g,b,p)
+            logging.info(f"[Bob P3] Private key b={b}")
+            logging.info(f"[Bob P3] Public key B=g^b mod p={B}")
+
+            # ③ Alice에게 전달
             send_json(conn,{"opcode":1,"type":"DH","public":B,"parameter":{"p":p,"g":g}})
+            
+            # ④ Alice의 공개키 A 수신
             msg=recv_json(conn)
             A=msg["public"]
+            logging.info(f"[Bob P3] Received Alice's public key A={A}")
+
+            # ⑤ 공유 비밀 계산
             secret=pow(A,b,p)
+            logging.info(f"[Bob P3] Shared secret (K = A^b mod p) = {secret}")
+
+            # ⑥ AES 키 파생
             key=derive_aes(secret)
+            logging.info(f"[Bob P3] Derived AES key (len={len(key)} bytes)")
+
+            # ⑦ AES 통신
             enc=recv_json(conn)
             pt=aes_dec_b64(enc["encryption"],key)
-            logging.info(f"[Bob P3] Decrypted from Alice: {pt}")
+            logging.info(f"[Bob P3] AES decrypted from Alice: {pt}")
             rep=aes_enc_b64("world",key)
             send_json(conn,{"opcode":2,"type":"AES","encryption":rep})
+            logging.info("[Bob P3] Sent AES reply to Alice.")
     except Exception as e:
         logging.error(e)
     finally:
@@ -89,7 +110,7 @@ def main():
     ap.add_argument("-p","--port",type=int,required=True)
     ap.add_argument("-l","--log",default="INFO")
     args=ap.parse_args()
-    logging.basicConfig(level=getattr(logging,args.log.upper(),logging.INFO))
+    logging.basicConfig(level=getattr(logging,args.log.upper(),logging.INFO),format="%(message)s")
     s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
     s.bind((args.addr,args.port)); s.listen(5)
     logging.info(f"[Bob P3] Listening on {args.addr}:{args.port}")
