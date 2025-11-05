@@ -32,15 +32,18 @@ def run(addr, port):
     pubkey = RSA.import_key(pubkey_pem)
     logging.info("[>] Received RSA public key.")
 
-    # 2️⃣ AES 키 생성 후 암호화
-    aes_key = os.urandom(32)
+    # 2️⃣ AES 256-bit 키 생성 후 암호화
+    aes_key = os.urandom(32)  # 32 bytes = 256 bits
+    assert len(aes_key) == 32
+    logging.info(f"[>] Generated AES key ({len(aes_key)*8}-bit)")
+
     rsa_cipher = PKCS1_OAEP.new(pubkey)
     enc_key = rsa_cipher.encrypt(aes_key)
     enc_key_b64 = base64.b64encode(enc_key).decode()
     s.send(json.dumps({
         "opcode": 2, "type": "RSA", "encrypted_key": enc_key_b64
     }).encode())
-    logging.info("[>] Sent encrypted AES key.")
+    logging.info("[>] Sent RSA-encrypted AES key.")
 
     # 3️⃣ “hello” 전송
     b64_enc = aes_encrypt(aes_key, "hello")
