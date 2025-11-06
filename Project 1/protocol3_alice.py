@@ -66,22 +66,19 @@ def main():
     if not is_generator(g,p):
         send_json(s,{"opcode":3,"error":"incorrect generator"});return
 
-    # ① Alice의 개인키 a 및 공개키 A 생성
     a=random.randint(2,p-2)
     A=pow(g,a,p)
     logging.info(f"[Alice P3] Private key a={a}")
     logging.info(f"[Alice P3] Public key A=g^a mod p={A}")
     send_json(s,{"opcode":1,"type":"DH","public":A})
 
-    # ② 공유 비밀 생성
     secret=pow(B,a,p)
     logging.info(f"[Alice P3] Shared secret (K = B^a mod p) = {secret}")
 
-    # ③ AES 키 파생
     key=derive_aes(secret)
     logging.info(f"[Alice P3] Derived AES key (len={len(key)} bytes)")
 
-    # ④ AES 통신
+
     enc=aes_enc_b64("hello",key)
     send_json(s,{"opcode":2,"type":"AES","encryption":enc})
     rep=recv_json(s)
