@@ -4,9 +4,7 @@ import logging
 import json
 import random
 
-# ==========================================================
-# 🔹 동일한 Miller–Rabin 소수 판별 함수
-# ==========================================================
+
 def is_prime(n, k=5):
     if n <= 1:
         return False
@@ -34,9 +32,7 @@ def is_prime(n, k=5):
     return True
 
 
-# ==========================================================
-# 🔹 클라이언트 실행
-# ==========================================================
+
 def run(addr, port):
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     conn.connect((addr, port))
@@ -64,9 +60,9 @@ def run(addr, port):
 
     # 소수성 검증
     if is_prime(p) and is_prime(q):
-        print("✅ Verified: Both p and q are prime numbers.")
+        print("Verified: Both p and q are prime numbers.")
     else:
-        print("❌ Invalid primes detected.")
+        print("Invalid primes detected.")
 
     conn.close()
 

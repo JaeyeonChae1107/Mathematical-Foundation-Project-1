@@ -5,9 +5,7 @@ import logging
 import json
 import random
 
-# ==========================================================
-# 🔹 Miller–Rabin 소수 판별 함수
-# ==========================================================
+
 def is_prime(n, k=5):
     if n <= 1:
         return False
@@ -35,9 +33,7 @@ def is_prime(n, k=5):
     return True
 
 
-# ==========================================================
-# 🔹 gcd / modular inverse (Python 3.7 호환)
-# ==========================================================
+
 def gcd(a, b):
     while b:
         a, b = b, a % b
@@ -56,9 +52,6 @@ def mod_inverse(e, phi):
     return x % phi
 
 
-# ==========================================================
-# 🔹 RSA 키 생성 (gcd 확인 + mod_inverse 사용)
-# ==========================================================
 def generate_rsa_keys():
     primes = [p for p in range(400, 501) if is_prime(p)]
     e = 65537
@@ -69,7 +62,7 @@ def generate_rsa_keys():
         phi = (p - 1) * (q - 1)
 
         if gcd(e, phi) == 1:
-            d = mod_inverse(e, phi)   # ✅ Python 3.7 호환 버전
+            d = mod_inverse(e, phi)
             logging.info(f"Generated RSA keys: p={p}, q={q}, n={n}")
             return {"p": p, "q": q, "n": n, "e": e, "d": d}
         else:
@@ -77,9 +70,7 @@ def generate_rsa_keys():
             continue
 
 
-# ==========================================================
-# 🔹 클라이언트 요청 처리
-# ==========================================================
+
 def handler(sock):
     try:
         data = sock.recv(4096).decode()
@@ -108,9 +99,6 @@ def handler(sock):
         sock.close()
 
 
-# ==========================================================
-# 🔹 서버 실행
-# ==========================================================
 def run(addr, port):
     bob = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     bob.bind((addr, port))
