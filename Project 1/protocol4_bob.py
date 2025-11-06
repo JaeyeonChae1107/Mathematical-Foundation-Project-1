@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 import socket, json, argparse, random, logging
 
 def send_json(c,o): c.sendall((json.dumps(o)+"\n").encode())
