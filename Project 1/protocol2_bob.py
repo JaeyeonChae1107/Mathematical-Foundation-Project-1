@@ -38,7 +38,15 @@ def handler(sock):
             enc_key = base64.b64decode(enc_key_b64)
             rsa_cipher = PKCS1_OAEP.new(key)
             aes_key = rsa_cipher.decrypt(enc_key)
-            logging.info("[+] AES key received and decrypted.")
+
+            # 🔒 키 길이 확인 및 보정
+            if len(aes_key) != 32:
+                logging.warning(f"[!] AES key length = {len(aes_key)} bytes, adjusting to 32 bytes.")
+                if len(aes_key) < 32:
+                    aes_key = aes_key.ljust(32, b'\0')
+                else:
+                    aes_key = aes_key[:32]
+            logging.info(f"[+] AES key received and verified ({len(aes_key)*8}-bit).")
 
             # 3️⃣ AES 메시지 수신 및 복호화
             aes_msg = json.loads(sock.recv(8192).decode())
