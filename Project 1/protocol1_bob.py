@@ -40,7 +40,6 @@ def gcd(a, b):
     return a
 
 def mod_inverse(e, phi):
-    """Python 3.7용 확장 유클리드 알고리즘 기반 modular inverse"""
     def egcd(a, b):
         if a == 0:
             return (b, 0, 1)
