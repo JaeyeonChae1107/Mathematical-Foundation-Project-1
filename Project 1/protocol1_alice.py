@@ -4,7 +4,6 @@ import logging
 import json
 import random
 
-
 def is_prime(n, k=5):
     if n <= 1:
         return False
@@ -12,12 +11,10 @@ def is_prime(n, k=5):
         return True
     if n % 2 == 0:
         return False
-
     r, d = 0, n - 1
     while d % 2 == 0:
         r += 1
         d //= 2
-
     for _ in range(k):
         a = random.randrange(2, n - 2)
         x = pow(a, d, n)
@@ -31,41 +28,72 @@ def is_prime(n, k=5):
             return False
     return True
 
-
+def gcd(a, b):
+    while b:
+        a, b = b, a % b
+    return a
 
 def run(addr, port):
-    conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    conn.connect((addr, port))
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((addr, port))
     logging.info(f"Alice connected to {addr}:{port}")
 
-    # Bob에게 RSA 키 요청
-    msg = {"opcode": 0, "type": "RSAKey"}
-    conn.send(json.dumps(msg).encode())
-    logging.info("[>] Sent RSA key request to Bob")
+    try:
+        
+        req = {"opcode": 0, "type": "RSAKey"}
+        sock.sendall(json.dumps(req).encode())
+        logging.info("[>] Sent RSA key request to Bob")
 
-    # Bob의 응답 수신
-    data = conn.recv(4096).decode()
-    reply = json.loads(data)
-    logging.info(f"[<] Received reply from Bob: {reply}")
+        
+        data = sock.recv(8192).decode()
+        if not data:
+            logging.error("No data received from Bob.")
+            return
 
-    p = reply["parameter"]["p"]
-    q = reply["parameter"]["q"]
-    e = reply["public"]
-    d = reply["private"]
+        try:
+            reply = json.loads(data)
+        except json.JSONDecodeError:
+            logging.error("Invalid JSON from Bob: %r", data)
+            return
 
-    print("\n=== RSA Key Exchange Result ===")
-    print(f"p = {p}, q = {q}")
-    print(f"Public key (e) = {e}")
-    print(f"Private key (d) = {d}")
+        logging.info(f"[<] Received reply from Bob: {reply}")
 
-    # 소수성 검증
-    if is_prime(p) and is_prime(q):
-        print("Verified: Both p and q are prime numbers.")
-    else:
-        print("Invalid primes detected.")
+        try:
+            p = int(reply["parameter"]["p"])
+            q = int(reply["parameter"]["q"])
+            e = int(reply["public"])
+            d = int(reply["private"])
+        except (KeyError, TypeError, ValueError) as ex:
+            logging.error(f"Missing or invalid fields in Bob's reply: {ex}")
+            return
 
-    conn.close()
+        n = p * q
+        phi = (p - 1) * (q - 1)
 
+        checks = []
+        checks.append(("p in [400,500]", 400 <= p <= 500))
+        checks.append(("q in [400,500]", 400 <= q <= 500))
+        checks.append((f"p={p} is prime", is_prime(p)))
+        checks.append((f"q={q} is prime", is_prime(q)))
+        checks.append(("gcd(e, phi) == 1", gcd(e, phi) == 1))
+        checks.append(("(e*d) % phi == 1", (e * d) % phi == 1))
+
+        print("\n=== Protocol I — RSA Key & Verification (Alice) ===")
+        print(f"p = {p}, q = {q}")
+        print(f"n = p*q = {n}")
+        print(f"public e = {e}")
+        print(f"private d = {d}\n")
+
+        all_ok = True
+        for name, ok in checks:
+            status = "OK" if ok else "FAIL"
+            print(f"[{status}] {name}")
+            if not ok:
+                all_ok = False
+
+
+    finally:
+        sock.close()
 
 def command_line_args():
     parser = argparse.ArgumentParser()
@@ -74,12 +102,10 @@ def command_line_args():
     parser.add_argument("-l", "--log", metavar="<log level>", help="Log level", type=str, default="INFO")
     return parser.parse_args()
 
-
 def main():
     args = command_line_args()
-    logging.basicConfig(level=getattr(logging, args.log.upper()))
+    logging.basicConfig(level=getattr(logging, args.log.upper(), logging.INFO))
     run(args.addr, args.port)
-
 
 if __name__ == "__main__":
     main()

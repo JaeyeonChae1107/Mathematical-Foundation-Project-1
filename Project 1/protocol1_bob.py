@@ -33,7 +33,6 @@ def is_prime(n, k=5):
     return True
 
 
-
 def gcd(a, b):
     while b:
         a, b = b, a % b
@@ -69,7 +68,6 @@ def generate_rsa_keys():
             continue
 
 
-
 def handler(sock):
     try:
         data = sock.recv(4096).decode()
@@ -82,12 +80,13 @@ def handler(sock):
 
         if msg.get("opcode") == 0 and msg.get("type") == "RSAKey":
             rsa = generate_rsa_keys()
+            # 🔧 변경점: parameter에서 "n"을 제거하고 p, q만 보냄
             reply = {
                 "opcode": 0,
                 "type": "RSAKey",
                 "public": rsa["e"],
                 "private": rsa["d"],
-                "parameter": {"p": rsa["p"], "q": rsa["q"], "n": rsa["n"]},
+                "parameter": {"p": rsa["p"], "q": rsa["q"]},
             }
             sock.sendall(json.dumps(reply).encode())
             logging.info("[+] Sent RSA key pair to Alice.")
