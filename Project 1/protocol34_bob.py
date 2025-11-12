@@ -1,7 +1,8 @@
-import socket, json, base64, argparse
+import socket, json, base64, argparse, random
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
+# ===== AES utils =====
 def pad(msg):
     return msg + chr(16 - len(msg) % 16) * (16 - len(msg) % 16)
 
@@ -21,6 +22,62 @@ def aes_decrypt(key, b64_ct):
 def modexp(a, e, m):
     return pow(a, e, m)
 
+# ===== Prime / Generator utilities =====
+def is_probable_prime(n: int) -> bool:
+    if n < 2:
+        return False
+    for p in [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]:
+        if n == p:
+            return True
+        if n % p == 0:
+            return False
+    d, s = n - 1, 0
+    while d % 2 == 0:
+        d //= 2
+        s += 1
+    for a in [2, 3, 5, 7, 11]:
+        x = pow(a, d, n)
+        if x in (1, n - 1):
+            continue
+        for _ in range(s - 1):
+            x = (x * x) % n
+            if x == n - 1:
+                break
+        else:
+            return False
+    return True
+
+def prime_factors(n: int):
+    f, d = set(), 2
+    while d * d <= n:
+        while n % d == 0:
+            f.add(d)
+            n //= d
+        d += 1
+    if n > 1:
+        f.add(n)
+    return f
+
+def is_generator(g: int, p: int) -> bool:
+    if not is_probable_prime(p):
+        return False
+    phi = p - 1
+    for q in prime_factors(phi):
+        if pow(g, phi // q, p) == 1:
+            return False
+    return True
+
+def generate_prime_and_generator():
+    """Generate a random prime p (400~500) and valid generator g."""
+    while True:
+        p = random.randint(400, 500)
+        if not is_probable_prime(p):
+            continue
+        for g in range(2, p - 1):
+            if is_generator(g, p):
+                return p, g
+
+# ===== Net utils =====
 def send_json(sock, obj):
     sock.send(json.dumps(obj).encode())
 
@@ -33,6 +90,7 @@ def recv_json(sock):
     except:
         return None
 
+# ===== Main =====
 def run(port, mode):
     s = socket.socket()
     s.bind(("0.0.0.0", port))
@@ -50,11 +108,11 @@ def run(port, mode):
 
     # === Step 1: select parameters depending on mode ===
     if mode == "normal":
-        p, g = 457, 62                # valid prime, valid generator
+        p, g = generate_prime_and_generator()
     elif mode == "nonprime":
-        p, g = 456, 62                # not prime
+        p, g = 456, 62
     elif mode == "nongenerator":
-        p, g = 457, 456               # g not generator
+        p, g = 457, 456
     else:
         print("[Bob] Invalid mode. Use: normal / nonprime / nongenerator")
         conn.close()
