@@ -4,28 +4,55 @@ import argparse
 import logging
 import json
 import base64
+import random
 from Crypto.Cipher import AES
 
-# 메시지 패딩
+# 패딩 및 제거
 def pad(msg):
     pad_len = 16 - (len(msg) % 16)
     return msg + chr(pad_len) * pad_len
 
-# 패딩 제거
 def unpad(msg):
     return msg[:-ord(msg[-1])]
 
-# AES 암호화
+# AES 암복호화 (ECB, Base64)
 def aes_encrypt(key, plaintext):
     cipher = AES.new(key, AES.MODE_ECB)
     return base64.b64encode(cipher.encrypt(pad(plaintext).encode())).decode()
 
-# AES 복호화
 def aes_decrypt(key, ciphertext_b64):
     cipher = AES.new(key, AES.MODE_ECB)
     return unpad(cipher.decrypt(base64.b64decode(ciphertext_b64)).decode(errors="ignore"))
 
-# RSA per-byte 복호화
+# 소수 판별 및 랜덤 소수 생성 (400-500 범위)
+def is_prime(num):
+    if num < 2:
+        return False
+    for i in range(2, int(num ** 0.5) + 1):
+        if num % i == 0:
+            return False
+    return True
+
+def generate_prime():
+    while True:
+        candidate = random.randint(400, 500)
+        if is_prime(candidate):
+            return candidate
+
+# 모듈러 역원 (Python 3.7 호환)
+def modinv(a, m):
+    # 확장 유클리드로 a^{-1} mod m 계산
+    def egcd(x, y):
+        if y == 0:
+            return (1, 0)
+        else:
+            q, r = divmod(x, y)
+            s, t = egcd(y, r)
+            return (t, s - q * t)
+    inv, _ = egcd(a, m)
+    return inv % m
+
+# RSA per-byte 복호화 (정수 리스트 -> bytes)
 def rsa_decrypt_list(enc_list, d, n):
     dec_bytes = bytearray()
     for c in enc_list:
@@ -44,20 +71,16 @@ def handler(sock, bob_msg):
         req = json.loads(data)
         logging.info(f"Received: {req}")
 
-        # RSA 키 생성
-        p, q = 457, 449
+        # RSA 키 생성 (매 세션마다 새로 생성)
+        p, q = generate_prime(), generate_prime()
+        while p == q:
+            q = generate_prime()
         n = p * q
         phi = (p - 1) * (q - 1)
         e = 65537
+        d = modinv(e, phi)
 
-        # d 계산 (확장 유클리드)
-        def egcd(a, b):
-            if b == 0:
-                return (1, 0)
-            else:
-                x, y = egcd(b, a % b)
-                return (y, x - (a // b) * y)
-        d = egcd(e, phi)[0] % phi
+        logging.info(f"Generated RSA keypair (p={p}, q={q}, n={n})")
 
         # RSA 요청 응답
         if req.get("type") in ("RSA", "RSAKey"):
@@ -69,7 +92,7 @@ def handler(sock, bob_msg):
             }
             sock.send(json.dumps(reply).encode())
 
-        # AES 키 수신
+        # AES 키 수신 (RSA per-byte 암호화된 리스트)
         data = sock.recv(8192).decode().strip()
         if not data:
             sock.close()
@@ -79,6 +102,10 @@ def handler(sock, bob_msg):
             enc_list = aes_msg["encrypted_key"]
             aes_key = rsa_decrypt_list(enc_list, d, n)
             logging.info("AES key decrypted.")
+        else:
+            logging.warning("AES key message not received or unexpected format.")
+            sock.close()
+            return
 
         # AES 메시지 수신
         data = sock.recv(8192).decode().strip()
@@ -99,6 +126,8 @@ def handler(sock, bob_msg):
             }
             sock.send(json.dumps(resp).encode())
             print(f"[Bob] Sent response: {bob_msg}")
+        else:
+            logging.warning("AES message not received or unexpected format.")
 
     except Exception as e:
         logging.error(f"Handler error: {e}")
