@@ -80,7 +80,6 @@ def handler(sock):
 
         if msg.get("opcode") == 0 and msg.get("type") == "RSAKey":
             rsa = generate_rsa_keys()
-            # 🔧 변경점: parameter에서 "n"을 제거하고 p, q만 보냄
             reply = {
                 "opcode": 0,
                 "type": "RSAKey",
