@@ -6,6 +6,7 @@ import json
 import base64
 import random
 from Crypto.Cipher import AES
+import math
 
 # 패딩 및 제거
 def pad(msg):
@@ -78,6 +79,14 @@ def handler(sock, bob_msg):
         n = p * q
         phi = (p - 1) * (q - 1)
         e = 65537
+                # e와 phi가 서로소인지 확인
+        if math.gcd(e, phi) != 1:
+            # 만약 서로소가 아니면, 새로운 소수 e를 선택
+            logging.warning(f"[Bob] gcd(e, phi) != 1 — regenerating e.")
+            while True:
+                e = generate_prime()
+                if math.gcd(e, phi) == 1:
+                    break
         d = modinv(e, phi)
 
         logging.info(f"Generated RSA keypair (p={p}, q={q}, n={n})")
